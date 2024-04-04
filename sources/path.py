@@ -54,7 +54,7 @@ AC            = 0.5   #  Weight of constraint in null-space optimization algorit
 TARG          = 5e-3  # Threshold for integral compliance
 STOCHTARG     = 30*TARG  # Threshold for integral compliance
 FINALTIME     = 1.0 # Final time 
-DELTATIME     = 0.05 # Length of time intervals
+DELTATIME     = 0.01 # Length of time intervals
 NTIMESTEPS    = int(FINALTIME/DELTATIME)  # Number of timesteps
 WEIGHTAVG     = 1.0
 
