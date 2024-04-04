@@ -1,6 +1,0 @@
-/Users/karnae0000/lib/libCommons.dylib
-/Users/karnae0000/include/chrono.h
-/Users/karnae0000/include/eigen.h
-/Users/karnae0000/include/libmesh5.h
-/Users/karnae0000/include/lplib3.h
-/Users/karnae0000/include/sparse.h

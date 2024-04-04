@@ -1,4 +1,0 @@
-/Users/karnae0000/lib/libAdvection.dylib
-/Users/karnae0000/include/ad_calls.h
-/Users/karnae0000/include/advect.h
-/Users/karnae0000/bin/advect

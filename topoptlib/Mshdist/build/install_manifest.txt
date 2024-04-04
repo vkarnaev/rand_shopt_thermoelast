@@ -1,4 +1,0 @@
-/usr/local/bin/mshdist
-/usr/local/lib/libMshdist.dylib
-/usr/local/include/mshdist.h
-/usr/local/include/mshdistexterns.h
