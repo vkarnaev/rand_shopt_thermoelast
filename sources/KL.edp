@@ -1,0 +1,51 @@
+include "./sources/inout.idp"
+include "./sources/macros.idp"
+load "msh3"
+
+string MESH = getsParam(EXCHFILE,"MeshName");
+int NSPACEEIGENS = getiParam(EXCHFILE, "NumberOfSpaceEigens");
+int NTIMEEIGENS = getiParam(EXCHFILE, "NumberOfTimeEigens");
+
+mesh Th = readmesh(MESH);
+fespace Vh(Th);
+
+Vh Text, StochText, eVs;
+Vh[int] Stoch(NOFTIMESTEPS+1);
+
+real[int] eVt(NOFTIMESTEPS+1); 
+
+for(int s=1;s<NSPACEEIGENS+1;s++){
+    ifstream fins("./sources/stoch_temp/seig_" + s + ".txt");
+    fins >> eVs[];  
+    for(int t=1;t<NTIMEEIGENS+1;t++){
+            ifstream fint("./sources/stoch_temp/teig_" + t + ".txt");     
+            int nn; fint >> nn;
+            for (int i=0;i<nn;i++) {
+                fint >> eVt[i];
+
+                Stoch[i] = Stoch[i] + eVt[i]*eVs;
+            }
+    }
+}
+
+real normText, normStoch, normStochText;
+
+for(int i=0;i<NOFTIMESTEPS+1;i++){
+    Text = funcText(i*DELTATIME);
+    normText = normText + DELTATIME*int2d(Th)(Text*Text);
+
+    normStoch = normStoch+ DELTATIME*int2d(Th)(Stoch[i]*Stoch[i]);
+
+    StochText = Text + Stoch[i];
+    normStochText = normStochText + DELTATIME*int2d(Th)(StochText*StochText);
+
+    //plot(Text, fill=true, value = true, wait=true);
+    //plot(Text, fill=true, value = true, wait=true);
+    plot(StochText, fill=true, value = true, wait=true);
+}
+
+normText = sqrt(normText);
+normStoch = sqrt(normStoch);
+normStochText = sqrt(normStochText);
+
+cout << normStoch/normStochText << endl;

@@ -1,0 +1,54 @@
+/* Resolution of the linearized elasticity equation on the input shape */
+include "./sources/inout.idp"
+include "./sources/macros.idp"
+load "medit"
+load "msh3"
+
+/* Get mesh and sol names, and global parameters */
+string MESH       = getsParam(EXCHFILE,"MeshName");
+string PHI        = getsParam(EXCHFILE,"PhiName");
+string NEWPHI     = getsParam(EXCHFILE,"NewPhiName");
+int REFINT        = getiParam(EXCHFILE,"Refint");
+int REFISO        = getiParam(EXCHFILE,"ReferenceBnd");
+
+/* Loading mesh */
+mesh Th = readmesh(MESH);
+
+/* Finite element spaces and functions */
+fespace Vh(Th,P1);
+Vh phi, nonOpt, newphi;
+
+loadsol(PHI,phi[]);
+
+/* Definition of the non-optimizable region */
+int np = Th.nv;
+real r = 0.2;
+real[int] o(3),co(3);
+real[int] tab(np);
+
+
+for(int n=0; n<np; n++) {
+  tab[n] = 100.0;
+}
+
+for(int n=0; n<np; n++) {
+  o[0] = Th(n).x;
+  o[1] = Th(n).y;
+  
+  
+  /* Upper surface*/
+  tab[n] = min(tab[n], 0.95 - o[1]);
+  
+  /* Supports */
+  tab[n] = min(tab[n], max(o[1] - 0.05, 0.4-abs(o[0]-0.5)));
+}
+
+nonOpt[] = tab;
+
+/*for(int n=0; n<np; n++) {
+  newphi[n] = -min(phi[n], nonOpt[n]);
+}*/
+newphi = min(phi, nonOpt);
+
+/* Save new function */
+printsol(NEWPHI,newphi[]);

@@ -1,0 +1,144 @@
+/* Resolution of the linearized elasticity equation on the input shape */
+include "./sources/inout.idp"
+include "./sources/macros.idp"
+load "medit"
+
+load "iovtk"
+include "getARGV.idp"
+
+int s = getARGV("-s", 0);
+int t = getARGV("-t", 0); 
+int ind = getARGV("-i", 0); 
+
+/* Get mesh and sol names, and global parameters */
+string MESH       = getsParam(EXCHFILE,"MeshName");
+string SOLPATTERN      = getsParam(EXCHFILE,"TemperatureName");
+string SOLEXTENSION    = getsParam(EXCHFILE,"TemperatureExtension");
+int REFINT        = getiParam(EXCHFILE,"Refint");
+int REFDIR        = getiParam(EXCHFILE,"Dirichlet");
+int REFNEU        = getiParam(EXCHFILE,"Neumann");
+int REFFOU        = getiParam(EXCHFILE,"Fourier");
+int REFISO        = getiParam(EXCHFILE,"ReferenceBnd");
+real DENSITY      = getrParam(EXCHFILE,"DensityOfMaterial");
+real THERMK       = getrParam(EXCHFILE,"ThermalK");
+real THERMBETA    = getrParam(EXCHFILE,"ThermalBeta");
+//real THERMQGEN    = getrParam(EXCHFILE,"ThermalQgen");
+//real THERMDIR     = getrParam(EXCHFILE,"TemperatureDirichlet");
+real THERMREF     = THERMDIR; //getrParam(EXCHFILE,"TemperatureDirichlet");
+real THETAMETHOD  = 0.5;
+//real THERMWAVE    = 100.0;
+
+
+/* Loading mesh */
+mesh Th = readmesh(MESH);
+mesh Th1 = readmesh("./res/step.0.mesh");
+
+/* Finite element spaces and functions */
+fespace Vh(Th,P1);
+fespace Vh0(Th,P0);
+fespace Vh1(Th1, P1);
+Vh T, S, Told, Text, Textold;
+Vh0 reg = region;
+Vh1 eVs;
+
+real[int] eVt(NOFTIMESTEPS+1);
+
+/* Mesh of the interior part and corresponding FE space */
+mesh Thi = trunc(Th,(reg(x,y) == REFINT),label=REFINT);
+fespace Vhi(Thi,P1);
+Vhi Ti, Si, Toldi;
+
+
+
+/* Definition of the thermal field around the structure */
+//real timeMax = DELTATIME * NOFTIMESTEPS;
+//func real funcText(real tt){return THERMDIR + max(0.0, -THERMWAVE*sin((y - 2*tt/(timeMax))*(pi)));};
+
+if(s==0) {
+	Textold = funcText(0.0);
+}
+else {
+	ifstream fint("./sources/stoch_temp/teig_" + t + ".txt");     
+	int nn; fint >> nn;
+	for (int i=0;i<nn;i++) fint >> eVt[i];
+
+	ifstream fins("./sources/stoch_temp/seig_" + s + ".txt");
+	fins >> eVs[];   
+
+	Textold = eVt[0]*eVs;
+}
+
+Toldi = THERMDIR;
+Ti = Toldi;
+
+string name = "e" + ind + "_t0";
+printsol(combinestrings(SOLPATTERN, name, SOLEXTENSION),Ti[]);
+
+/* Initial condition for the temperature */
+//loadsol(combinestrings(SOLPATTERN, 0, SOLEXTENSION), Told[]);
+
+
+/* Variational formulation of the problem using a theta-method*/
+/*problem thermal(Ti, Si) = int2d(Thi)(DENSITY * Ti*Si)
+ 	+ int2d(Thi)(DELTATIME*THERMK * (dx(Ti)*dx(Si) + dy(Ti)*dy(Si)))
+	- int2d(Thi)(DENSITY * Toldi*Si)
+	- int2d(Thi)(DELTATIME*THERMK * (dx(Toldi)*dx(Si) + dy(Toldi)*dy(Si)))
+	+ int1d(Thi,REFISO,REFNEU)(DELTATIME*THERMBETA * (Ti * Si))
+	- int2d(Thi)(DELTATIME*THERMQGEN*Si)
+	- int1d(Thi,REFISO,REFNEU)(DELTATIME*THERMBETA * (Text * Si))
+        + on(REFDIR,Ti=THERMDIR);*/
+
+//varf vMass(Ti, Si) = int2d(Thi)(DENSITY*Ti*Si/DELTATIME);
+
+varf vThermic(Ti, Si) = int2d(Thi)(DENSITY*Ti*Si/DELTATIME)
+			+ int2d(Thi)((1.0 - THETAMETHOD) * THERMK * (dx(Ti)*dx(Si) + dy(Ti)*dy(Si)))
+			+ int1d(Thi, REFNEU, REFFOU)((1.0 - THETAMETHOD)*THERMBETA * (Ti * Si))
+			+ on(REFDIR,Ti=THERMDIR);
+			
+varf vThermicOld(Ti, Si) = int2d(Thi)(DENSITY*Ti*Si/DELTATIME)
+			- int2d(Thi)(THETAMETHOD * THERMK * (dx(Ti)*dx(Si) + dy(Ti)*dy(Si)))
+			- int1d(Thi, REFNEU, REFFOU)(THETAMETHOD * THERMBETA * (Ti * Si))
+			+ on(REFDIR,Ti=THERMDIR);
+
+real tgv = 1e30;
+matrix A = vThermic(Vhi, Vhi, tgv=tgv, solver=CG);
+matrix Aold = vThermicOld(Vhi, Vhi, tgv=tgv);
+//matrix M = vMass(Vhi, Vhi);
+
+
+real[int] b = vThermicOld(0,Vhi); //constant part of RHS
+real[int] bcn = vThermic(0,Vhi); //tgv on Dirichlet part
+real[int] bcl = tgv*Toldi[];   //the Dirichlet B.C. part
+
+real [int] TEMP = b;
+// The fast loop
+
+//plot(Ti, fill = true, value = true, wait = true);
+
+for(int ii = 1; ii < NOFTIMESTEPS+1; ii++){
+	if(s==0) Text = funcText(ii*DELTATIME);
+	else Text = eVt[ii]*eVs;
+
+	varf vHeatExt(Ti, Si) = int1d(Thi, REFNEU, REFFOU)(THERMBETA * ((THETAMETHOD* Textold
+									+ (1.0-THETAMETHOD) *	Text) * Si));
+	b = vHeatExt(0,Vhi); //constant part of RHS
+	TEMP = Aold*Toldi[];
+	b += Aold*Toldi[]; //add the the time dependent part
+	b = bcn ? bcl : b; //do $\forall i$: b[i] = bcn[i] ? bcl[i] : b[i];
+	Ti[] = A^-1*b; //solve linear problem
+
+	//plot(Text,fill = true, value = true, wait = true);
+	plot(Ti, fill = true, value = true, wait = true);
+
+	name = "e" + ind + "_t" + ii;
+	printsol(combinestrings(SOLPATTERN, name, SOLEXTENSION),Ti[]);
+
+	Toldi = Ti;
+	Textold = Text;
+}
+
+
+
+
+
+

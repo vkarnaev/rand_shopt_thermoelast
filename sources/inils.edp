@@ -1,0 +1,49 @@
+/* Creation of the initial level set function: cantilever test case */
+include "./sources/inout.idp"
+include "./sources/macros.idp"
+
+/* Get mesh and sol names */
+string MESH = getsParam(EXCHFILE,"MeshName");
+string PHI  = getsParam(EXCHFILE,"PhiName");
+
+/* Read mesh */
+mesh Th = readmesh(MESH);
+
+/* Finite element space and functions */
+fespace Vh(Th,P1);
+Vh phi;
+
+/* Definition of the initial level set function */
+func real iniLS(real xx,real yy) {
+  real cx,cy;
+  real r = 0.05;
+  real dd = 10.0;
+  
+  dd = max(min(dd, 0.48-abs(xx-0.5)), 0.03-yy);
+  
+  dd = min(dd, max(-0.4 + abs(0.5 - xx), yy-0.03));
+  
+  for(int i1=0; i1<2; i1++) {
+    for(int i2 = 0; i2<5; i2++){
+      cx = 0.25*i2;
+      cy = 0.15 + 0.4*i1;
+      dd = min(dd,sqrt((xx-cx)^2+(yy-cy)^2)-r);
+    }
+  }
+  
+  for(int i1=0; i1<2; i1++) {
+    for(int i2 = 0; i2<4; i2++){
+      cx = 0.125+0.25*i2;
+      cy = 0.35 + 0.4*i1;
+      dd = min(dd,sqrt((xx-cx)^2+(yy-cy)^2)-r);
+    }
+  }
+  
+  
+  return (dd);
+}
+
+phi = -iniLS(x,y);
+
+/* Save LS function */
+printsol(PHI,phi[]);

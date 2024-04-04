@@ -1,0 +1,131 @@
+/* Calculation of the compliance of the input structure */
+include "./sources/inout.idp"
+include "./sources/macros.idp"
+
+/* Get mesh and sol names, and global parameters */
+string MESH       = getsParam(EXCHFILE,"MeshName");
+string DISPLPATTERN      = getsParam(EXCHFILE,"DisplName");
+string DISPLEXTENSION    = getsParam(EXCHFILE,"DisplExtension");
+string TEMPERATUREPATTERN      = getsParam(EXCHFILE,"TemperatureName");
+string TEMPERATUREEXTENSION    = getsParam(EXCHFILE,"TemperatureExtension");
+string ADJOINTDISPLACEMENTPATTERN      = getsParam(EXCHFILE,"AdjointDisplacementName");
+string ADJOINTDISPLACEMENTEXTENSION    = getsParam(EXCHFILE,"AdjointDisplacementExtension");
+string ADJOINTTEMPERATUREPATTERN      = getsParam(EXCHFILE,"AdjointTemperatureName");
+string ADJOINTTEMPERATUREEXTENSION    = getsParam(EXCHFILE,"AdjointTemperatureExtension");
+int REFINT        = getiParam(EXCHFILE,"Refint");
+int REFDIR        = getiParam(EXCHFILE,"Dirichlet");
+int REFNEU        = getiParam(EXCHFILE,"Neumann");
+int REFFOU        = getiParam(EXCHFILE,"Fourier");
+int REFISO        = getiParam(EXCHFILE,"ReferenceBnd");
+real loadx 	  = getrParam(EXCHFILE,"Loadx");
+real loady 	  = getrParam(EXCHFILE,"Loady");
+real ALPHATHERM   = getrParam(EXCHFILE,"ThermalCoupling");
+real DENSITY      = getrParam(EXCHFILE,"DensityOfMaterial");
+real THERMK       = getrParam(EXCHFILE,"ThermalK");
+real THERMBETA    = getrParam(EXCHFILE,"ThermalBeta");
+real WEIGHTAVG    = getrParam(EXCHFILE,"WeightOfAverage");
+real WEIGHTFINAL  = 1.0 - WEIGHTAVG;
+real THETAMETHOD  = 0.5;
+
+
+/* Loading mesh */
+mesh Th = readmesh(MESH);
+
+/* Finite element spaces and functions */
+fespace Vh(Th,P1);
+//fespace Vh2(Th,[P1, P1]);
+Vh ux,uy, T, TOld, wx, wy;
+Vh R, ROld;
+//Vh2 [ux2, uy2];
+fespace Vh0(Th,P0);
+Vh0 reg = region;
+
+//Vh Text = funcText(NOFTIMESTEPS*DELTATIME);
+
+/* Mesh of the interior part and corresponding FE space */
+mesh Thi = trunc(Th,(reg(x,y) == REFINT),label=REFINT);
+fespace Vhi(Thi,P1);
+Vhi Ti, TminusTrefi, Si, TOldi, Ri, ROldi;
+Vhi uxi, uyi, wxi, wyi, wxOldi, wyOldi, vxi, vyi, TEMPi;
+
+/* Load temperature and displacement fields */
+loadsol(combinestrings(TEMPERATUREPATTERN, NOFTIMESTEPS, TEMPERATUREEXTENSION), TOldi[]);
+loadvec2(combinestrings(DISPLPATTERN, NOFTIMESTEPS, DISPLEXTENSION), uxi[], uyi[]);
+//TOldi = TOld;
+//uxi = ux;
+//uyi = uy;
+
+//Texti = funcText(NOFTIMESTEPS*DELTATIME);
+TminusTrefi = TOldi - THERMDIR;
+
+/*varf vAdjointDispl1([wxi2, wyi2], [vxi2, vyi2]) = int2d(Thi)(sigeps(wxi2, wyi2, vxi2, vyi2))
+						+ on(REFDIR,wxi2=0.0, wyi2 = 0.0);*/
+
+
+//matrix B1 = vAdjointDispl1(Vhi2, Vhi2, tgv=tgv, solver=CG);
+
+problem pbAdjointMech([wxi, wyi], [vxi, vyi]) = int2d(Thi)(sigeps(wxi, wyi, vxi, vyi))
+						-int2d(Thi)(sigeps(uxi, uyi, vxi, vyi))
+						-int2d(Thi)(-ALPHATHERM * TminusTrefi * divg(vxi, vyi))
+						+ on(REFDIR,wxi=0.0, wyi = 0.0);
+						
+pbAdjointMech;
+wxOldi[] = wxi[];// + uxi[];
+wyOldi[] = wyi[];// + uyi[];
+//wx = wxOldi;
+//wy = wyOldi;
+printvec2(combinestrings(ADJOINTDISPLACEMENTPATTERN, NOFTIMESTEPS, ADJOINTDISPLACEMENTEXTENSION),wxOldi[],wyOldi[]);
+
+
+
+ROldi = WEIGHTFINAL*ALPHATHERM*(divg(wxi, wyi))/2;
+printsol(combinestrings(ADJOINTTEMPERATUREPATTERN, NOFTIMESTEPS, ADJOINTTEMPERATUREEXTENSION),ROldi[]);
+
+TEMPi = dx(wxi) + dy(wyi);
+printsol(combinestrings(ADJOINTTEMPERATUREPATTERN+"TEMP_DIV_w_", NOFTIMESTEPS, ADJOINTTEMPERATUREEXTENSION),TEMPi[]);
+
+
+problem pbAdjointThermal(Ri, Si) = int2d(Thi)(DENSITY*Ri*Si/DELTATIME)
+				  + int2d(Thi)((1.0-THETAMETHOD) * THERMK * (dx(Ri)*dx(Si) + dy(Ri)*dy(Si)))
+				  + int1d(Thi, REFNEU, REFFOU, 0)((1.0 - THETAMETHOD)*THERMBETA * (Ri * Si))
+				  - int2d(Thi)(DENSITY*ROldi*Si/DELTATIME)
+				  - int2d(Thi)((-1)*THETAMETHOD  * THERMK * (dx(ROldi)*dx(Si) + dy(ROldi)*dy(Si)))
+				  - int1d(Thi, REFNEU, REFFOU, 0)((-1)*THETAMETHOD*THERMBETA * (ROldi * Si))
+				  - int2d(Thi)(WEIGHTAVG*ALPHATHERM*THETAMETHOD *   (dx(wxOldi) + dy(wyOldi))/2 * Si)
+				  - int2d(Thi)(WEIGHTAVG*ALPHATHERM*(1-THETAMETHOD)*(dx(wxi) + dy(wyi))/2 * Si)
+				  + on(REFDIR,Ri = 0.0);
+
+
+for(int ii = NOFTIMESTEPS-1; ii > -1; ii--){
+	loadvec2(combinestrings(DISPLPATTERN, ii, DISPLEXTENSION), uxi[], uyi[]);
+	loadsol(combinestrings(TEMPERATUREPATTERN, ii, TEMPERATUREEXTENSION), Ti[]);
+//	Ti = T;
+//	uxi = ux;
+//	uyi = uy;
+	TminusTrefi = Ti - THERMDIR;
+	
+	pbAdjointMech;
+	
+//	wx = wxi;
+//	wy = wyi;
+	printvec2(combinestrings(ADJOINTDISPLACEMENTPATTERN, ii, ADJOINTDISPLACEMENTEXTENSION),wxi[],wyi[]);
+	
+	pbAdjointThermal;
+	
+//	R = Ri;
+	printsol(combinestrings(ADJOINTTEMPERATUREPATTERN, ii, ADJOINTTEMPERATUREEXTENSION),Ri[]);
+	ROldi = Ri;
+	wxOldi = wxi;
+	wyOldi = wyi;
+	
+	TEMPi = dx(wxi) + dy(wyi);
+	printsol(combinestrings(ADJOINTTEMPERATUREPATTERN+"TEMP_DIV_w_", ii, ADJOINTTEMPERATUREEXTENSION),TEMPi[]);
+	ROldi = Ri;
+	wxOldi = wxi;
+	wyOldi = wyi;
+}
+
+//---------------------------------------------------------------------------------
+
+
+

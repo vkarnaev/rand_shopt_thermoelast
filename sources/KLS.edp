@@ -1,0 +1,166 @@
+include "./sources/inout.idp"
+include "./sources/macros.idp"
+load "msh3"
+
+real PARAM = getrParam(EXCHFILE,"KernelParam");
+
+/************************************************************************/
+/*************************      SPACE KL      ***************************/
+/************************************************************************/
+
+
+/* MESH */
+string MESH = getsParam(EXCHFILE,"MeshName");
+
+mesh Th = readmesh(MESH);
+int size = Th.nv; // number of vertices
+
+/* KERNEL FUNCTIONS */
+
+func real KernelS (real xi, real yi, real xj, real yj){ // Spatial kernel
+    real sigma = 1.;
+    real rho = 1.;
+
+    real d = sqrt((xi-xj)^2 + (yi-yj)^2);
+
+    //return 1.;
+    return PARAM*sigma^2*(1 + sqrt(5)*d/rho + 5*d^2/(3*rho^2))*exp(-sqrt(5)*d/rho); // Matern
+}
+
+/* PIVOTED CHOLESKY DECOMPOSTION */
+
+real tl = 6e-4;
+
+int k = 0;
+int swtch = 0;
+int pivot = 0;
+
+real xi = 0.;
+real yi = 0.;
+real xk = 0.;
+real yk = 0.;
+
+real dk = 0.;
+real tr = 0.0;
+
+int[int] p(size);
+real[int] D(size);
+
+for (int i = 0; i < size; i++){
+    xi = Th(i).x;
+    yi = Th(i).y;
+
+    p(i) = i; // indeces
+    D(i) = KernelS(xi,yi,xi,yi); // diagonal
+
+    if (D(pivot) < D(i)) pivot = i; // pivot index
+    
+    tr += D(i); // trace
+}
+
+tl *= tr; // scaling prec by the trace for relative error
+
+int allocSize = 10; int LSize = allocSize;
+real[int,int] A(size,size); A = 0.; matrix L = A; L.resize(size, LSize);
+
+while (tl < tr){ // main loop
+    if (LSize - 1 <= k) {
+        LSize += allocSize;
+        L.resize(size, LSize); // resizing matrix
+    }
+
+    swtch = p(k);
+    p(k) = p(pivot);
+    p(pivot) = swtch; // changing p_pivot <-> p_k
+
+    dk = sqrt(D(p(k)));
+    L(p(k), k) = dk;
+
+    xk = Th(p(k)).x;
+    yk = Th(p(k)).y;
+
+    for (int i = k+1; i < size; i++){
+        xi = Th(p(i)).x;
+        yi = Th(p(i)).y;
+
+        L(p(i), k) = KernelS(xi,yi,xk,yk)/dk;
+    }
+
+    for (int i = k + 1; i < size; i++)
+        for (int j = 0; j < k; j++)
+            L(p(i), k) -= L(p(i), j) * L(p(k), j) /  dk; //update L
+
+  tr = 0.0;
+  pivot = k + 1;
+
+    for (int i = k+1; i < size; ++i) {
+        D(p(i)) -= L(p(i), k)^2; // update d
+        if (D(p(pivot)) < D(p(i))) pivot = i; // update pivot
+        tr += D(p(i)); // udate trace
+    }
+
+    k+=1;
+}
+
+L.resize(size, k); // resizing L
+
+//cout << endl << "Size: " << size << endl; 
+//cout << "Low rank size: " << k << endl; 
+
+/* TEST 
+
+matrix K = A; 
+matrix C = L*L';
+
+real F = 0;
+
+
+for(int i = 0; i<size; i++){
+    for(int j = 0; j<size; j++){
+        xi = Th(i).x;
+        yi = Th(i).y;
+
+        xk = Th(j).x;
+        yk = Th(j).y;
+        
+        F += abs(KernelS(xi,yi,xk,yk)-C(i,j))^2;
+    }
+}
+
+cout << "Error: " << F << endl << endl;
+
+*/
+
+/* EIGENVALUE PROBLEM */
+
+fespace Vh(Th, P1);
+varf inpr (u, v) = int2d(Th)(u*v); // inner product in L2
+matrix M = inpr(Vh, Vh, solver=CG, eps=1e-20); // stifness matrix in space
+
+matrix C = L'*M; C = C*L; // low-rank matrix approximation
+
+real[int] ev(C.n); // eigenvalues array
+
+border a(t=0, 2*pi){x=cos(t); y=sin(t); label=99;}
+mesh ThL = buildmesh(a(C.n), nbvx = C.n);
+fespace VhL(ThL, P1);
+VhL[int] eVL(C.n); // low-rank eigenvectors
+
+func real[int] FOP (real[int] & u){ real[int] Au = C*u; return Au; }
+int eig = EigenValue(C.n, A=FOP, mode=2, value=ev, nev = C.n, vector=eVL, tol=tl); // eigenvalue problem solution
+
+real[int] eV(size); //eigenvector 
+
+int ind = 0;
+
+for (int i = 0; i < eig; i++){
+    ind = i+1;
+
+    eV = L*eVL[i][]; 
+    eV = sqrt(ev[i])*eV;
+
+    ofstream fout("./sources/stoch_temp/seig_" + ind + ".txt");      
+    fout<<eV<<endl;  
+}
+
+setrParam(EXCHFILE,"NumberOfSpaceEigens",10);

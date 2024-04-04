@@ -1,0 +1,32 @@
+/* Calculation of the compliance of the input structure */
+include "./sources/inout.idp"
+include "./sources/macros.idp"
+
+/* Get mesh and sol names, and global parameters */
+string MESH       = getsParam(EXCHFILE,"MeshName");
+string FIELDNAME  = getsParam(EXCHFILE,"FieldName");
+string CUTFIELD   = getsParam(EXCHFILE,"CutFieldName");
+int REFINT        = getiParam(EXCHFILE,"Refint");
+
+
+/* Loading mesh */
+mesh Th = readmesh(MESH);
+
+/* Finite element spaces and functions */
+fespace Vh(Th,P1);
+Vh f;
+fespace Vh0(Th,P0);
+Vh0 reg = region;
+
+loadsol(FIELDNAME, f[]);
+
+/* Mesh of the interior part and corresponding FE space */
+mesh Thi = trunc(Th,(reg(x,y) == REFINT),label=REFINT);
+fespace Vhi(Thi,P1);
+Vhi fi;
+
+fi = f;
+
+
+/* Save solution */
+printsol(CUTFIELD, fi[]);

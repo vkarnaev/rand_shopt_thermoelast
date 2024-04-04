@@ -1,0 +1,29 @@
+/* General macros ansd global parameters for shape and topology optimization */
+/* File for communication of data with python */
+string EXCHFILE   = "./res/exch.data";
+
+/* Linear elasticity parameters */
+real lm  = getrParam(EXCHFILE,"LameLambda");
+real mu  = getrParam(EXCHFILE,"LameMu");
+
+/* Inner product for extension / regularization */
+real alpha        = getrParam(EXCHFILE,"Regularization");
+macro psreg(u,v) ( int2d(Th)(alpha^2*(dx(u)*dx(v)+dy(u)*dy(v)) + u*v) ) // EOM
+
+macro gradgrad(T,R) (dx(T)*dx(R) + dy(T)*dy(R)) // EOM
+macro divg(ux, uy) (dx(ux) + dy(uy)) // EOM
+macro sigeps(ux, uy, vx, vy) (mu*(2.0*dx(ux)*dx(vx) + (dx(uy)+dy(ux))*(dx(vy)+dy(vx))+ 2.0*dy(uy)*dy(vy)) + lm*(dx(ux)+dy(uy))*(dx(vx)+dy(vy))) // EOM
+
+macro combinestrings(root, idx, extension) root+string(idx)+extension // EOM
+
+/* Definition of the thermal field around the structure */
+real THERMDIR     = getrParam(EXCHFILE,"TemperatureDirichlet");
+int NOFTIMESTEPS  = getiParam(EXCHFILE,"NumberOfTimesteps");
+real DELTATIME    = getrParam(EXCHFILE,"DeltaTime");
+real THERMWAVE    = getrParam(EXCHFILE,"DeltaTemperatureWave");
+
+real timeMax = DELTATIME * NOFTIMESTEPS;
+func real funcText(real tt){return THERMDIR + max(0.0, -THERMWAVE*sin((y - 2*tt/(timeMax))*(pi)));};
+
+//real e = 2.71828182846;
+//func real funcText(real tt){return THERMDIR + (exp(3*x)-1)*THERMWAVE/(e^3-1);};

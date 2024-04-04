@@ -1,0 +1,22 @@
+include "./sources/inout.idp"
+include "./sources/macros.idp"
+load "iovtk"
+
+int REFINT  = getiParam(EXCHFILE,"Refint");
+string MESH = getsParam(EXCHFILE,"MeshName");
+
+mesh Th = readmesh(MESH);
+
+fespace Vh0(Th,P0);
+Vh0 reg = region;
+
+mesh Thi = trunc(Th,(reg(x,y) == REFINT),label=REFINT);
+fespace Vhi(Thi,P0); 
+Vhi regi = region;
+
+plot(regi, fill = true, wait = true, value = true);
+
+int[int] Order = [1];
+string DataName = "shape";
+savevtk("./res/plot/shape.vtu", Thi, regi, dataname=DataName, order=Order);
+

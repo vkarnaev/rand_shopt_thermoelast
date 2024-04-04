@@ -1,0 +1,28 @@
+/* Calculation of the compliance of the input structure */
+include "./sources/inout.idp"
+include "./sources/macros.idp"
+
+/* Get mesh and sol names, and global parameters */
+string MESH       = getsParam(EXCHFILE,"MeshName");
+string SOLPATTERN      = getsParam(EXCHFILE,"DisplName");
+string SOLEXTENSION    = getsParam(EXCHFILE,"DisplExtension");
+int REFINT        = getiParam(EXCHFILE,"Refint");
+
+/* Loading mesh */
+mesh Th = readmesh(MESH);
+
+/* Finite element spaces and functions */
+fespace Vh(Th,P1);
+fespace Vh0(Th,P0);
+Vh0 reg = region;
+mesh Thi = trunc(Th,(reg(x,y) == REFINT),label=REFINT);
+fespace Vhi(Thi,P1);
+Vhi uxi, uyi;
+
+loadvec2(combinestrings(SOLPATTERN, 100, SOLEXTENSION),uxi[],uyi[]);
+real val = 0.5 * int2d(Thi)(sigeps(uxi, uyi, uxi, uyi));
+
+
+/* Save result */
+setrParam(EXCHFILE,"Value",val);
+

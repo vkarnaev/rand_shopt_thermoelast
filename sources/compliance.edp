@@ -1,0 +1,68 @@
+/* Calculation of the compliance of the input structure */
+include "./sources/inout.idp"
+include "./sources/macros.idp"
+
+/* Get mesh and sol names, and global parameters */
+string MESH       = getsParam(EXCHFILE,"MeshName");
+string SOLPATTERN      = getsParam(EXCHFILE,"DisplName");
+string SOLEXTENSION    = getsParam(EXCHFILE,"DisplExtension");
+string TEMPERATUREPATTERN      = getsParam(EXCHFILE,"TemperatureName");
+string TEMPERATUREEXTENSION    = getsParam(EXCHFILE,"TemperatureExtension");
+int REFINT        = getiParam(EXCHFILE,"Refint");
+//int NOFTIMESTEPS  = getiParam(EXCHFILE,"NumberOfTimesteps");
+//real DELTATIME    = getrParam(EXCHFILE,"DeltaTime");
+real WEIGHTAVG    = getrParam(EXCHFILE,"WeightOfAverage");
+real ALPHATHERM   = getrParam(EXCHFILE,"ThermalCoupling");
+real THERMREF     = THERMDIR;
+
+/* Loading mesh */
+mesh Th = readmesh(MESH);
+
+/* Finite element spaces and functions */
+fespace Vh(Th,P1);
+fespace Vh0(Th,P0);
+Vh0 reg = region;
+mesh Thi = trunc(Th,(reg(x,y) == REFINT),label=REFINT);
+fespace Vhi(Thi,P1);
+Vhi Ti, uxi, uyi, Tref, wxi, wyi;
+
+Tref = THERMREF;
+
+
+real[int] cply(NOFTIMESTEPS+1), cplyMech(NOFTIMESTEPS+1), cplyTherm(NOFTIMESTEPS+1);
+
+real integralCplyMech = 0;
+real integralCplyTherm = 0;
+real integralCply = 0;
+
+for (int ii = 0; ii < NOFTIMESTEPS+1; ii++){
+	loadsol(combinestrings(TEMPERATUREPATTERN, ii, TEMPERATUREEXTENSION), Ti[]);
+	loadvec2(combinestrings(SOLPATTERN, ii, SOLEXTENSION),wxi[],wyi[]);
+	uxi = wxi; uyi = wyi;
+
+	cplyMech[ii] = 0.5 * int2d(Thi)(sigeps(uxi, uyi, uxi, uyi));
+	cplyTherm[ii] =  - 0.5*int2d(Thi)(ALPHATHERM * (Ti - Tref) * (divg(uxi, uyi))); 
+	cply[ii] = cplyMech[ii] + cplyTherm[ii];
+	
+	if (ii > 0){
+		integralCplyMech  += 0.5*(cplyMech[ii] +cplyMech[ii-1] )*DELTATIME;
+		integralCplyTherm += 0.5*(cplyTherm[ii]+cplyTherm[ii-1])*DELTATIME;
+		integralCply      += 0.5*(cply[ii]     +cply[ii-1]     )*DELTATIME;
+	}
+}
+
+real valMech  = integralCplyMech  * WEIGHTAVG + (1.0- WEIGHTAVG) * cplyMech[NOFTIMESTEPS];
+real valTherm = integralCplyTherm * WEIGHTAVG + (1.0- WEIGHTAVG) * cplyTherm[NOFTIMESTEPS];
+real val      = integralCply     * WEIGHTAVG + (1.0- WEIGHTAVG) * cply[NOFTIMESTEPS];
+
+
+
+/* Save result */
+setrParam(EXCHFILE,"ValueMech",valMech);
+setrParam(EXCHFILE,"ValueTherm",valTherm);
+setrParam(EXCHFILE,"Value",val);
+
+cout<<"valMech  = "<<valMech<<endl;
+cout<<"valTherm = "<<valTherm<<endl;
+cout<<"val      = "<<val<<endl;
+

@@ -1,0 +1,69 @@
+/* Resolution of the linearized elasticity equation on the input shape */
+include "./sources/inout.idp"
+include "./sources/macros.idp"
+load "medit"
+
+load "iovtk"
+include "getARGV.idp"
+
+int ind = getARGV("-i", 0);
+
+/* Get mesh and sol names, and global parameters */
+string MESH       = getsParam(EXCHFILE,"MeshName");
+string SOLPATTERN      = getsParam(EXCHFILE,"DisplName");
+string SOLEXTENSION    = getsParam(EXCHFILE,"DisplExtension");
+string TEMPERATUREPATTERN      = getsParam(EXCHFILE,"TemperatureName");
+string TEMPERATUREEXTENSION    = getsParam(EXCHFILE,"TemperatureExtension");
+int REFINT        = getiParam(EXCHFILE,"Refint");
+int REFDIR        = getiParam(EXCHFILE,"Dirichlet");
+int REFNEU        = getiParam(EXCHFILE,"Neumann");
+int REFISO        = getiParam(EXCHFILE,"ReferenceBnd");
+//int NOFTIMESTEPS  = getiParam(EXCHFILE,"NumberOfTimesteps");
+//real DELTATIME    = getrParam(EXCHFILE,"DeltaTime");
+real loadx 	  = getrParam(EXCHFILE,"Loadx");
+real loady 	  = getrParam(EXCHFILE,"Loady");
+//real THERMDIR     = getrParam(EXCHFILE,"TemperatureDirichlet"); // It might be changed 
+real ALPHATHERM   = getrParam(EXCHFILE,"ThermalCoupling");
+
+/* Loading mesh */
+mesh Th = readmesh(MESH);
+
+/* Finite element spaces and functions */
+fespace Vh(Th,P1);
+fespace Vh0(Th,P0);
+Vh ux,uy, T;
+Vh0 reg = region;
+
+
+/* Mesh of the interior part and corresponding FE space */
+mesh Thi = trunc(Th,(reg(x,y) == REFINT),label=REFINT);
+fespace Vhi(Thi,P1);
+Vhi uxi,uyi,vxi,vyi, Ti;
+//Ti = T;
+
+string name;
+
+/* Variational formulation of the problem */
+problem thermoelas([uxi,uyi],[vxi,vyi]) = int2d(Thi)(sigeps(uxi,uyi,vxi,vyi))
+                                        - int2d(Thi)(ALPHATHERM * (Ti - THERMDIR) * (dx(vxi) + dy(vyi)))
+                                   - int1d(Thi,REFNEU)(loadx*vxi+loady*vyi)
+                                   + on(REFDIR,uxi=0.0,uyi=0.0);
+
+for (int ii = 0; ii < NOFTIMESTEPS+1; ii++){
+	/*Load temperature*/
+	name = "e" + ind + "_t" +ii;
+	loadsol(combinestrings(TEMPERATUREPATTERN, name, TEMPERATUREEXTENSION), Ti[]);
+//	Ti = T;
+	
+	/* Solve problem */
+	thermoelas;
+	
+	/* Transfer the problem on the full mesh */
+//	ux = uxi;
+//	uy = uyi;
+	plot(uyi, fill = true, value = true, wait = true);
+	/* Save solution */
+	printvec2(combinestrings(SOLPATTERN, name, SOLEXTENSION),uxi[],uyi[]);
+}
+
+

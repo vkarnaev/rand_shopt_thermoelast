@@ -1,0 +1,167 @@
+include "./sources/inout.idp"
+include "./sources/macros.idp"
+load "msh3"
+
+real PARAM = getrParam(EXCHFILE,"KernelParam");
+
+/* TIME DISCRETIZATION */
+
+int size = NOFTIMESTEPS+1;
+
+real[int] T(size);
+
+T(0) = 0.;
+for(int i = 1; i < size; i++)
+    T(i) = T(i-1) + DELTATIME;
+
+/* KERNEL FUNCTION */
+
+func real Kernel (real ti, real tj){ // Time kernel
+    real sigma = 1.;
+
+    real d = abs(ti-tj);
+
+    return PARAM*exp(-d^2/(2*sigma^2))/(sqrt(2*pi)*sigma); // Gaussian
+}
+
+/* LOW-RANK APPROXIMATION
+
+real tl = 1e-6;
+
+int k = 0;
+int swtch = 0;
+int pivot = 0;
+
+real ti = 0.;
+real tk = 0.;
+
+real dk = 0.;
+real tr = 0.0;
+
+int[int] p(size);
+real[int] D(size);
+
+for (int i = 0; i < size; i++){
+    ti = T(i);
+
+    p(i) = i; // indeces
+    D(i) = Kernel(ti,ti); // diagonal
+
+    if (D(pivot) < D(i)) pivot = i; // pivot index
+    
+    tr += D(i); // trace
+}
+
+tl *= tr; // scaling prec by the trace for relative error
+
+int allocSize = 10; int LSize = allocSize;
+real[int,int] A(size,size); A = 0.; matrix L = A; L.resize(size, LSize);
+
+while (tl < tr){ // main loop
+    if (LSize - 1 <= k) {
+        LSize += allocSize;
+        L.resize(size, LSize); // resizing matrix
+    }
+
+    swtch = p(k);
+    p(k) = p(pivot);
+    p(pivot) = swtch; // changing p_pivot <-> p_k
+
+    dk = sqrt(D(p(k)));
+    L(p(k), k) = dk;
+
+    tk = T(p(k));
+
+    for (int i = k+1; i < size; i++){
+        ti = T(p(i));
+
+        L(p(i), k) = Kernel(ti,tk)/dk;
+    }
+
+    for (int i = k + 1; i < size; i++)
+        for (int j = 0; j < k; j++)
+            L(p(i), k) -= L(p(i), j) * L(p(k), j) /  dk; //update L
+
+  tr = 0.0;
+  pivot = k + 1;
+
+    for (int i = k+1; i < size; ++i) {
+        D(p(i)) -= L(p(i), k)^2; // update d
+        if (D(p(pivot)) < D(p(i))) pivot = i; // update pivot
+        tr += D(p(i)); // udate trace
+    }
+
+    k+=1;
+}
+
+L.resize(size, k); // resizing L
+
+cout << endl << "Size: " << size << endl; 
+cout << "Low rank size: " << k << endl; 
+
+matrix C = L'*L; // low-rank matrix 
+
+/* EIGENVALUE PROBLEM 
+
+real[int] ev(C.n); // eigenvalues array
+
+border a(t=0, 2*pi){x=cos(t); y=sin(t); label=99;}
+mesh ThL = buildmesh(a(C.n), nbvx = C.n);
+fespace VhL(ThL, P1);
+VhL[int] eVL(C.n); // low-rank eigenvectors
+
+func real[int] FOP (real[int] & u){ real[int] Au = C*u; return Au; }
+int eig = EigenValue(C.n, A=FOP, mode=2, value=ev, nev = C.n, vector=eVL, tol=tl); // eigenvalue problem solution
+
+real[int] eV(size); //eigenvector 
+
+for (int i = 0; i < C.n; i++){
+    eV =  L*eVL[i][]; 
+    eV = sqrt(ev[i])*eV;
+
+    ofstream fout("./sources/stoch_temp/eig/time/teig_" + i + ".txt");     
+    fout<<eV<<endl;
+}
+
+*/
+
+/* FULL-RANK MATRIX */
+
+real[int,int] A(size,size); matrix C = A;
+
+real ti = 0.;
+real tj = 0.;
+
+for(int i = 0; i<size; i++){
+    for(int j = 0; j<size; j++){
+        ti = T(i);
+        tj = T(j);
+        
+        C(i,j) = Kernel(ti,tj);
+    }
+}
+
+/* EIGENVALUE PROBLEM */
+
+real[int] ev(C.n); // eigenvalues array
+
+border a(t=0, 2*pi){x=cos(t); y=sin(t); label=99;}
+mesh ThL = buildmesh(a(C.n), nbvx = C.n);
+fespace VhL(ThL, P1);
+VhL[int] eV(C.n); // eigenvectors
+
+func real[int] FOP (real[int] & u){ real[int] Au = C*u; return Au; }
+int eig = EigenValue(C.n, A=FOP, mode=2, value=ev, nev = C.n, vector=eV, tol=1e-10); // eigenvalue problem solution
+ 
+int ind = 0;
+
+for (int i = 0; i < eig; i++){
+    ind = i+1;
+
+    eV[i] = sqrt(ev[i])*eV[i];
+
+    ofstream fout("./sources/stoch_temp/teig_" + ind + ".txt");     
+    fout<<eV[i][]<<endl;
+}
+
+setrParam(EXCHFILE,"NumberOfTimeEigens",3);

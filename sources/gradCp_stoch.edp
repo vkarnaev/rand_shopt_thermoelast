@@ -1,0 +1,201 @@
+/* Calculation of the sensitivity (i.e. integrand of the shape derivative)
+   and the shape gradient (not a descent direction) for the compliance functional */
+include "./sources/inout.idp"
+include "./sources/macros.idp"
+
+/* Get mesh and sol names */
+string MESH       = getsParam(EXCHFILE,"MeshName");
+string DISPLPATTERN      = getsParam(EXCHFILE,"DisplName");
+string DISPLEXTENSION    = getsParam(EXCHFILE,"DisplExtension");
+string TEMPERATUREPATTERN      = getsParam(EXCHFILE,"TemperatureName");
+string TEMPERATUREEXTENSION    = getsParam(EXCHFILE,"TemperatureExtension");
+string ADJOINTDISPLACEMENTPATTERN      = getsParam(EXCHFILE,"AdjointDisplacementName");
+string ADJOINTDISPLACEMENTEXTENSION    = getsParam(EXCHFILE,"AdjointDisplacementExtension");
+string ADJOINTTEMPERATUREPATTERN      = getsParam(EXCHFILE,"AdjointTemperatureName");
+string ADJOINTTEMPERATUREEXTENSION    = getsParam(EXCHFILE,"AdjointTemperatureExtension");
+string NORVEC     = getsParam(EXCHFILE,"NorvecName");
+string DIFFCP     = getsParam(EXCHFILE,"DiffName");
+string GRADCP     = getsParam(EXCHFILE,"GradName");
+int REFINT        = getiParam(EXCHFILE,"Refint");
+int REFDIR        = getiParam(EXCHFILE,"Dirichlet");
+int REFNEU        = getiParam(EXCHFILE,"Neumann");
+int REFFOU        = getiParam(EXCHFILE,"Fourier");
+int REFISO        = getiParam(EXCHFILE,"ReferenceBnd");
+real loadx 	  = getrParam(EXCHFILE,"Loadx");
+real loady 	  = getrParam(EXCHFILE,"Loady");
+real ALPHATHERM   = getrParam(EXCHFILE,"ThermalCoupling");
+real DENSITY      = getrParam(EXCHFILE,"DensityOfMaterial");
+real THERMK       = getrParam(EXCHFILE,"ThermalK");
+real THERMBETA    = getrParam(EXCHFILE,"ThermalBeta");
+real WEIGHTAVG    = getrParam(EXCHFILE,"WeightOfAverage");
+real WEIGHTFINAL  = 1.0 - WEIGHTAVG;
+int NSPACEEIGENS = getiParam(EXCHFILE, "NumberOfSpaceEigens");
+int NTIMEEIGENS = getiParam(EXCHFILE, "NumberOfTimeEigens");
+
+/* Loading mesh */
+mesh Th = readmesh(MESH);
+mesh Th1 = readmesh("./res/step.0.mesh");
+
+/* Finite element spaces and functions */
+fespace Vh(Th,P1);
+fespace Vh0(Th,P0);
+fespace Vh1(Th1,P1);
+
+Vh Text, norvecx, norvecy;
+Vh1 eVs;
+Vh sd, g;
+Vh0 reg = region;
+Vh derivIntegral, derivFinal, deriv;
+
+real[int] eVt(NOFTIMESTEPS+1); 
+
+/*Load normal vector*/
+loadvec2(NORVEC,norvecx[],norvecy[]);
+
+//TEMPFIELD[] = wy[] - uy[];
+
+/* Computation of the mean curvature H */
+Vh Hcurv; // mean curvature. Hcurv =?= div(norvec)
+Hcurv = divg(norvecx, norvecy);
+
+/* Mesh of the interior part and corresponding FE spaces */
+mesh Thi = trunc(Th,(reg(x,y) == REFINT),label=REFINT);
+fespace Vhi(Thi,P1);
+fespace Vh0i(Thi,P0);
+Vhi uxi,uyi, Ti, wxi, wyi, Ri, Tnewi, norvecix, norveciy;
+/*Vhi derivi;*/
+
+norvecix = norvecx;
+norveciy = norvecy;
+
+macro nGradn(vx, vy) (norvecix * (dx(vx)*norvecix + dy(vx)*norveciy)+ norveciy * (dx(vy)*norvecix + dy(vy)*norveciy))  //EOM
+	
+deriv = 0.0;
+
+string name = "e0_t0";
+
+loadsol(combinestrings(TEMPERATUREPATTERN, name, TEMPERATUREEXTENSION),Ti[]);
+
+for (int ii = 0; ii < NOFTIMESTEPS; ii++){
+	/* Load vector and scalar fields */
+		name = "e0_t" + ii;
+
+		loadvec2(combinestrings(DISPLPATTERN, name, DISPLEXTENSION),uxi[],uyi[]);
+		loadvec2(combinestrings(ADJOINTDISPLACEMENTPATTERN, name, ADJOINTDISPLACEMENTEXTENSION),wxi[],wyi[]);
+		loadsol(combinestrings(ADJOINTTEMPERATUREPATTERN, name, ADJOINTTEMPERATUREEXTENSION),Ri[]);
+
+		int ti = ii+1;
+		name = "e0_t" + ti;
+
+		loadsol(combinestrings(TEMPERATUREPATTERN, name, TEMPERATUREEXTENSION),Tnewi[]);
+	/*	uxi = ux;
+		uyi = uy;
+		wxi = wx;
+		wyi = wy;
+		Ti = T;
+		Tnewi = Tnew;
+		Ri = R;*/
+		Text = funcText(ii*DELTATIME);
+		
+		/* Compute the integral part of the derivative */
+		derivIntegral = (- WEIGHTAVG*0.5 * sigeps(uxi, uyi, wxi, wyi) 
+				+ WEIGHTAVG*0.5 * ALPHATHERM * (Ti - THERMDIR) * (divg(wxi, wyi))
+				- WEIGHTAVG*0.5 * ALPHATHERM * (Ti - THERMDIR) * nGradn(wxi, wyi)
+				- THERMBETA * Ri * (Ti - Text) * (Hcurv - 2. * THERMBETA / THERMK)
+				- THERMK * (dx(Ti)*dx(Ri) + dy(Ti)*dy(Ri))
+				- DENSITY * (Tnewi - Ti)/DELTATIME * Ri)
+				//- THERMBETA * Ri *(dx(Text)*norvecx + dy(Text)*norvecy))
+			*DELTATIME;
+
+		deriv = deriv + derivIntegral;
+		
+		Ti = Tnewi;
+}
+
+int ind = 1;
+
+for (int ss = 1; ss <  NSPACEEIGENS + 1; ss++){
+	ifstream fins("./sources/stoch_temp/seig_" + ss + ".txt");
+    fins >> eVs[];  
+	for (int tt = 1; tt <  NTIMEEIGENS + 1; tt++){
+		ifstream fint("./sources/stoch_temp/teig_" + tt + ".txt");     
+    	int nn; fint >> nn;
+
+		name = "e" + ind + "_t0";
+		loadsol(combinestrings(TEMPERATUREPATTERN, name, TEMPERATUREEXTENSION),Ti[]);
+
+		for (int ii = 0; ii < NOFTIMESTEPS; ii++){
+		/* Load vector and scalar fields */
+			name = "e" + ind + "_t" + ii;
+
+			loadvec2(combinestrings(DISPLPATTERN, name, DISPLEXTENSION),uxi[],uyi[]);
+			loadvec2(combinestrings(ADJOINTDISPLACEMENTPATTERN, name, ADJOINTDISPLACEMENTEXTENSION),wxi[],wyi[]);
+			loadsol(combinestrings(ADJOINTTEMPERATUREPATTERN, name, ADJOINTTEMPERATUREEXTENSION),Ri[]);
+
+			int ti = ii+1;
+			name = "e" + ind + "_t" + ti;
+
+			loadsol(combinestrings(TEMPERATUREPATTERN, name, TEMPERATUREEXTENSION),Tnewi[]);
+		/*	uxi = ux;
+			uyi = uy;
+			wxi = wx;
+			wyi = wy;
+			Ti = T;
+			Tnewi = Tnew;
+			Ri = R;*/
+			fint >> eVt[ii];
+			Text = eVt[ii]*eVs;
+			
+			/* Compute the integral part of the derivative */
+			derivIntegral = (- WEIGHTAVG*0.5 * sigeps(uxi, uyi, wxi, wyi) 
+					+ WEIGHTAVG*0.5 * ALPHATHERM * (Ti - THERMDIR) * (divg(wxi, wyi))
+					- WEIGHTAVG*0.5 * ALPHATHERM * (Ti - THERMDIR) * nGradn(wxi, wyi)
+					- THERMBETA * Ri * (Ti - Text) * (Hcurv - 2. * THERMBETA / THERMK)
+					- THERMK * (dx(Ti)*dx(Ri) + dy(Ti)*dy(Ri))
+					- DENSITY * (Tnewi - Ti)/DELTATIME * Ri
+					//- THERMBETA * Ri *(dx(Text)*norvecx + dy(Text)*norvecy))
+				*DELTATIME;
+
+			deriv = deriv + derivIntegral;
+			
+			Ti = Tnewi;
+		}
+
+		ind++;
+	}
+}
+/*
+loadvec2(combinestrings(DISPLPATTERN, NOFTIMESTEPS, DISPLEXTENSION),uxi[],uyi[]);
+loadvec2(combinestrings(ADJOINTDISPLACEMENTPATTERN, NOFTIMESTEPS, ADJOINTDISPLACEMENTEXTENSION),wxi[],wyi[]);
+loadsol(combinestrings(TEMPERATUREPATTERN, NOFTIMESTEPS, TEMPERATUREEXTENSION),Ti[]);
+loadsol(combinestrings(ADJOINTTEMPERATUREPATTERN, NOFTIMESTEPS, ADJOINTTEMPERATUREEXTENSION),Ri[]);
+
+derivFinal = - WEIGHTFINAL*0.5 * sigeps(uxi, uyi, wxi, wyi) 
+	   + WEIGHTFINAL*0.5 * ALPHATHERM * (Ti - THERMDIR) * (divg(wxi, wyi))
+	   - WEIGHTFINAL*0.5 * ALPHATHERM * (Ti - THERMDIR) * nGradn(wxi, wyi);
+
+deriv = deriv +	derivFinal;
+*/
+
+/* Linear form associated to the shape derivative, and associated table of values*/
+varf shapeder(sd,v) = int1d(Thi,REFISO)(deriv*v)+on(REFNEU, sd=0.0);
+sd[] = shapeder(0,Vh);
+
+/* Gradient of the volume functional after (scalar) extension / regularization */
+varf innerproduct(g,v) = psreg(g,v);
+matrix A = innerproduct(Vh,Vh);
+g[] = A^-1 * sd[];
+
+/* Resolution of the extension - regularization problem */
+/*Vh gg, v;
+problem velext(gg,v) = psreg(gg,v)
+                        - int1d(Thi,REFISO)(deriv*v)
+                        + on(REFNEU,gg=0.0);
+
+velext;*/
+
+/* Solve problem and save solution */
+printsol(DIFFCP,sd[]);
+printsol(GRADCP,g[]);
+
+//printsol(TMP,TEMPFIELD[]);
