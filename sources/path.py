@@ -57,6 +57,7 @@ FINALTIME     = 1.0 # Final time
 DELTATIME     = 0.05 #0.01 # Length of time intervals
 NTIMESTEPS    = int(FINALTIME/DELTATIME)  # Number of timesteps
 WEIGHTAVG     = 1.0
+NJOBS         = 5
 
 # Paths to folders
 RES     = "./res/"       # Directory for results
