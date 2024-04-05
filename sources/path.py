@@ -14,8 +14,8 @@ REFNEU        = 11       # Reference for Neumann B.C
 REFFOU        = REFISO   # Reference for Fourier-Robin B.C
 
 # Parameters of the mesh
-HMIN          = 0.005
-HMAX          = 0.010
+HMIN          = 0.01 #0.005
+HMAX          = 0.03 #0.010
 MESHSIZ       = 0.5*(HMIN + HMAX)
 HAUSD         = 0.01
 HGRAD         = 1.3
@@ -43,7 +43,7 @@ KERNELPARAM = 0.1;
 DT	          = 1.0*MESHSIZ   # Timestep optimization algorithm
 EPS           = 1e-10 # Precision parameter
 EPSP          = 1e-20 # Precision parameter for packing
-ALPHA         = 1.0*MESHSIZ # Parameter for velocity extension - regularization                 1.0*MESHSIZ
+ALPHA         = 1.0*MESHSIZ # Parameter for velocity extension - regularization    
 MAXIT         = 300  # Maximum number of iterations in the shape optimization process
 MAXITLS       = 3   # Maximum number of iterations in the line search procedure
 MAXCOEF       = 2.0  # Maximum allowed move between two iterations (in # * MESHSIZ)
@@ -52,9 +52,9 @@ TOL           = 0.02  # Tolerance for a slight increase in the merit
 AJ            = 0.3   # Weight of objective in null-space optimization algorithm
 AC            = 0.5   #  Weight of constraint in null-space optimization algorithm
 TARG          = 5e-3  # Threshold for integral compliance
-STOCHTARG     = 30*TARG  # Threshold for integral compliance
+STOCHTARG     = 35*TARG  # Threshold for integral compliance
 FINALTIME     = 1.0 # Final time 
-DELTATIME     = 0.01 # Length of time intervals
+DELTATIME     = 0.05 #0.01 # Length of time intervals
 NTIMESTEPS    = int(FINALTIME/DELTATIME)  # Number of timesteps
 WEIGHTAVG     = 1.0
 

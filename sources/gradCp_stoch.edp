@@ -152,7 +152,7 @@ for (int ss = 1; ss <  NSPACEEIGENS + 1; ss++){
 					- WEIGHTAVG*0.5 * ALPHATHERM * (Ti - THERMDIR) * nGradn(wxi, wyi)
 					- THERMBETA * Ri * (Ti - Text) * (Hcurv - 2. * THERMBETA / THERMK)
 					- THERMK * (dx(Ti)*dx(Ri) + dy(Ti)*dy(Ri))
-					- DENSITY * (Tnewi - Ti)/DELTATIME * Ri
+					- DENSITY * (Tnewi - Ti)/DELTATIME * Ri)
 					//- THERMBETA * Ri *(dx(Text)*norvecx + dy(Text)*norvecy))
 				*DELTATIME;
 

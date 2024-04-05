@@ -70,6 +70,7 @@ def thermoelastic_stoch(mesh, ind) :
 
   if ( proc.returncode != 0 ) :
     print("Error in thermoelasticity calculation; abort. "+str(proc.returncode))
+    print("{FreeFem} {thermoelasticity} > /dev/null 2>&1".format(FreeFem=path.FREEFEM,thermoelasticity=name))
     exit()
   
 def elastic(mesh) :
@@ -183,6 +184,7 @@ def adjoints_stoch(mesh,ind) :
   
   if ( proc.returncode != 0 ) :
     print("Error in adjoint calculation; abort. "+str(proc.returncode))
+    print("{FreeFem} {adjoints} > /dev/null 2>&1".format(FreeFem=path.FREEFEM,adjoints=name))
     exit()
 
 
