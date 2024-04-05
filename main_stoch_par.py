@@ -240,7 +240,7 @@ class StructureOptimizable(Optimizable) :
 optSettings = {"dt" : path.DT,
                "alphaJ" : path.AJ,
                "alphaC" : path.AC,
-               "maxit" : 0, #path.MAXIT,
+               "maxit" : path.MAXIT,
                "provide_gradient" : True,
                "maxtrials" : path.MAXITLS,
                "itnormalisation" : 20,
