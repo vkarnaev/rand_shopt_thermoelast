@@ -1,4 +1,5 @@
 .DS_Store
 res/
+sources/path.py
 sources/__pycache__/
 sources/stoch_temp/
