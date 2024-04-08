@@ -33,7 +33,7 @@ Th0i = trunc(Th0,3) #Trunc the solid mesh
 #Th0i.plot(title='Solid mesh',boundary='all');
 
 # Resolution of the state equation in time
-def solve_thermal_stoch(x,i):
+def solve_thermoelastic_stoch(x,i):
     if(i==0):
         t = 0
         s = 0
@@ -41,14 +41,15 @@ def solve_thermal_stoch(x,i):
         t = (i-1)%NTIMEEIGENS + 1
         s = (i-1)%NSPACEEIGENS + 1
     mechtools.thermal_stoch(x, s, t, i)
-
-def solve_thermoelastic_stoch(x,i):
     mechtools.thermoelastic_stoch(x, i)
+
+#def solve_thermoelastic_stoch(x,i):
+#    mechtools.thermoelastic_stoch(x, i)
 
 def solve_adjoints_stoch(x,i):
     mechtools.adjoints_stoch(x,i)
 
-joblib.Parallel(n_jobs=path.NJOBS)(joblib.delayed(solve_thermal_stoch)(path.step(0,"mesh"),i) for i in range(NEIGENS+1))
+#joblib.Parallel(n_jobs=path.NJOBS)(joblib.delayed(solve_thermal_stoch)(path.step(0,"mesh"),i) for i in range(NEIGENS+1))
 joblib.Parallel(n_jobs=path.NJOBS)(joblib.delayed(solve_thermoelastic_stoch)(path.step(0,"mesh"),i) for i in range(NEIGENS+1))
     
 
@@ -98,7 +99,7 @@ class StructureOptimizable(Optimizable) :
             # Calculate u
             it = int(nam.rpartition('.')[2])
 
-            joblib.Parallel(n_jobs=path.NJOBS)(joblib.delayed(solve_thermal_stoch)(x,i) for i in range(NEIGENS+1))
+            #joblib.Parallel(n_jobs=path.NJOBS)(joblib.delayed(solve_thermal_stoch)(x,i) for i in range(NEIGENS+1))
             joblib.Parallel(n_jobs=path.NJOBS)(joblib.delayed(solve_thermoelastic_stoch)(x,i) for i in range(NEIGENS+1))
 
             self.ucomputed = True
