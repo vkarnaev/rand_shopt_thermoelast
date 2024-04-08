@@ -34,8 +34,12 @@ Th0i = trunc(Th0,3) #Trunc the solid mesh
 
 # Resolution of the state equation in time
 def solve_thermal_stoch(x,i):
-    t = (i-1)%NTIMEEIGENS + 1
-    s = (i-1)%NSPACEEIGENS + 1
+    if(i==0):
+        t = 0
+        s = 0
+    else:
+        t = (i-1)%NTIMEEIGENS + 1
+        s = (i-1)%NSPACEEIGENS + 1
     mechtools.thermal_stoch(x, s, t, i)
 
 def solve_thermoelastic_stoch(x,i):
@@ -44,12 +48,8 @@ def solve_thermoelastic_stoch(x,i):
 def solve_adjoints_stoch(x,i):
     mechtools.adjoints_stoch(x,i)
 
-
-mechtools.thermal_stoch(path.step(0,"mesh"), 0, 0, 0)
-mechtools.thermoelastic_stoch(path.step(0,"mesh"), 0)
-
-joblib.Parallel(n_jobs=2)(joblib.delayed(solve_thermal_stoch)(path.step(0,"mesh"),i) for i in range(1,NEIGENS+1))
-joblib.Parallel(n_jobs=2)(joblib.delayed(solve_thermoelastic_stoch)(path.step(0,"mesh"),i) for i in range(1,NEIGENS+1))
+joblib.Parallel(n_jobs=path.NJOBS)(joblib.delayed(solve_thermal_stoch)(path.step(0,"mesh"),i) for i in range(NEIGENS+1))
+joblib.Parallel(n_jobs=path.NJOBS)(joblib.delayed(solve_thermoelastic_stoch)(path.step(0,"mesh"),i) for i in range(NEIGENS+1))
     
 
 # Computation of the volume of the shape and the probability of interest
@@ -98,11 +98,8 @@ class StructureOptimizable(Optimizable) :
             # Calculate u
             it = int(nam.rpartition('.')[2])
 
-            mechtools.thermal_stoch(x, 0, 0, 0)
-            mechtools.thermoelastic_stoch(x, 0)
-
-            joblib.Parallel(n_jobs=2)(joblib.delayed(solve_thermal_stoch)(x,i) for i in range(1,NEIGENS+1))
-            joblib.Parallel(n_jobs=2)(joblib.delayed(solve_thermoelastic_stoch)(x,i) for i in range(1,NEIGENS+1))
+            joblib.Parallel(n_jobs=path.NJOBS)(joblib.delayed(solve_thermal_stoch)(x,i) for i in range(NEIGENS+1))
+            joblib.Parallel(n_jobs=path.NJOBS)(joblib.delayed(solve_thermoelastic_stoch)(x,i) for i in range(NEIGENS+1))
 
             self.ucomputed = True
       
@@ -142,7 +139,7 @@ class StructureOptimizable(Optimizable) :
 
             # Calculate dH and gradH
             if len(ineq_indices) > 0:
-                joblib.Parallel(n_jobs=2)(joblib.delayed(solve_adjoints_stoch)(x,i) for i in range(NEIGENS+1))
+                joblib.Parallel(n_jobs=path.NJOBS)(joblib.delayed(solve_adjoints_stoch)(x,i) for i in range(NEIGENS+1))
                 phi  = path.step(it,"phi.sol")
                 lstools.norvec(x,phi,None,path.step(it,"norvec.sol"))
                 mechtools.gradCp_stoch(x, path.step(it,"norvec.sol"), path.step(0,"diffCp.sol"),
@@ -240,7 +237,7 @@ class StructureOptimizable(Optimizable) :
 optSettings = {"dt" : path.DT,
                "alphaJ" : path.AJ,
                "alphaC" : path.AC,
-               "maxit" : 0, #path.MAXIT,
+               "maxit" : path.MAXIT,
                "provide_gradient" : True,
                "maxtrials" : path.MAXITLS,
                "itnormalisation" : 20,

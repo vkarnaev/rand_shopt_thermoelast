@@ -44,7 +44,7 @@ DT	          = 1.0*MESHSIZ   # Timestep optimization algorithm
 EPS           = 1e-10 # Precision parameter
 EPSP          = 1e-20 # Precision parameter for packing
 ALPHA         = 1.0*MESHSIZ # Parameter for velocity extension - regularization    
-MAXIT         = 300  # Maximum number of iterations in the shape optimization process
+MAXIT         = 150  # Maximum number of iterations in the shape optimization process
 MAXITLS       = 3   # Maximum number of iterations in the line search procedure
 MAXCOEF       = 2.0  # Maximum allowed move between two iterations (in # * MESHSIZ)
 MINCOEF       = 0.02 # Minimum allowed move between two iterations (in # * MESHSIZ)
@@ -57,6 +57,7 @@ FINALTIME     = 1.0 # Final time
 DELTATIME     = 0.05 #0.01 # Length of time intervals
 NTIMESTEPS    = int(FINALTIME/DELTATIME)  # Number of timesteps
 WEIGHTAVG     = 1.0
+NJOBS         = 5
 
 # Paths to folders
 RES     = "./res/"       # Directory for results
