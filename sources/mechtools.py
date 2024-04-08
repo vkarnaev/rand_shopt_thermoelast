@@ -41,7 +41,7 @@ def thermal_stoch(mesh,s,t, ind) :
     proc = subprocess.Popen(["{FreeFem} {thermal} > /dev/null 2>&1".format(FreeFem=path.FREEFEM,thermal=name)],shell=True)
     proc.wait()
     i+=1
-    if ( i==10 ) :
+    if (i==100) :
       print("Error in thermal calculation; abort. "+str(proc.returncode))
       print("{FreeFem} {thermal} > /dev/null 2>&1".format(FreeFem=path.FREEFEM,thermal=name))
       exit()
@@ -77,8 +77,9 @@ def thermoelastic_stoch(mesh, ind) :
   i = 0
   while (proc.returncode != 0):
     proc = subprocess.Popen(["{FreeFem} {thermoelasticity} > /dev/null 2>&1".format(FreeFem=path.FREEFEM,thermoelasticity=name)],shell=True)
+    proc.wait()
     i+=1
-    if (i==10) :
+    if (i==100) :
       print("Error in thermoelasticity calculation; abort. "+str(proc.returncode))
       print("{FreeFem} {thermoelasticity} > /dev/null 2>&1".format(FreeFem=path.FREEFEM,thermoelasticity=name))
       exit()
@@ -197,7 +198,7 @@ def adjoints_stoch(mesh,ind) :
     proc = subprocess.Popen(["{FreeFem} {adjoints} > /dev/null 2>&1".format(FreeFem=path.FREEFEM,adjoints=name)],shell=True)
     proc.wait()
     i+=1
-    if (i==10) :
+    if (i==100) :
       print("Error in adjoint calculation; abort. "+str(proc.returncode))
       print("{FreeFem} {adjoints} > /dev/null 2>&1".format(FreeFem=path.FREEFEM,adjoints=name))
       exit()
