@@ -163,4 +163,4 @@ for (int i = 0; i < eig; i++){
     fout<<eV<<endl;  
 }
 
-setrParam(EXCHFILE,"NumberOfSpaceEigens",10);
+setrParam(EXCHFILE,"NumberOfSpaceEigens",eig);
