@@ -70,11 +70,15 @@ SCRIPT  = "./sources/"   # Directory for sources
 
 # Call for the executables of external codes
 FREEFEM = "FreeFem++ -nw"
-MSHDIST = "mshdist"
+#MSHDIST = "mshdist"
+MSHDIST  = "~/bin/mshdist" 
 #ADVECT  = "~/Advection/build/advect"
 #MMG2D   = "~/mmg/build/bin/mmg2d_O3"
-ADVECT  = "~/Documents/researches/num/topoptlib/Advection/build/advect"
-MMG2D   = "~/Documents/researches/num/topoptlib/mmg/build/bin/mmg2d_O3"
+#ADVECT  = "~/Documents/researches/num/topoptlib/Advection/build/advect"
+#MMG2D   = "~/Documents/researches/num/topoptlib/mmg/build/bin/mmg2d_O3"
+ADVECT   = "~/bin/advect"
+MMG2D    = "~/bin/mmg2d_O3"
+
 
 # Path to FreeFem scripts
 FFTEST         = SCRIPT + "testFF.edp"

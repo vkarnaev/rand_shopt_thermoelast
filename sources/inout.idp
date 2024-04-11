@@ -55,8 +55,8 @@ func real setrParam(string file,string kwd,real rpar) {
   {
     ofstream fo(file,append);
     if ( s==kwd ) {
-      //s="sed -i '"+n+"c\ "+rpar+"' "+file;
-      s="gsed -i '"+n+"c\ "+rpar+"' "+file;
+      s="sed -i '"+n+"c\ "+rpar+"' "+file;
+      //s="gsed -i '"+n+"c\ "+rpar+"' "+file;
       exec(s);
     }
     else {
