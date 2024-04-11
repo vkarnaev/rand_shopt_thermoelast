@@ -3,3 +3,4 @@ res/
 sources/__pycache__/
 sources/stoch_temp/
 sources/path.py
+sources/inout.idp
