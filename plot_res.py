@@ -1,6 +1,8 @@
 import pandas as pd
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-
+import subprocess
 from sources import path
 from pymedit import Mesh
 
@@ -34,7 +36,7 @@ def createGraphs(fileResName):
     plt.plot(iters, JJ)
     plt.xlabel("Iterations")
     plt.ylabel("Volume")
-    plt.title("Elasticity")
+    plt.title("Objective")
     plt.savefig(path.FIGOBJ, format="eps")
     # Constraints
     figH = plt.figure()
@@ -43,14 +45,17 @@ def createGraphs(fileResName):
         plt.plot(iters, [(hhh[c] + 1.0)*path.TARG for hhh in HH], label="constr. "+str(c))
     plt.xlabel("Iterations")
     plt.ylabel("Constraint")
-    plt.title("Elasticity")
+    plt.title("Constraint")
     plt.savefig(path.FIGCONSTR, format="eps")
-    
     
 treatfile(path.HISTO)    
 createGraphs(path.HISTO)
 
-nplot = path.MAXIT
-mesh = path.step(nplot,"mesh")
+mesh = path.step(path.MAXIT,"mesh")
 M = Mesh(mesh)
-M.plot(title = "Elasticity")
+figplot = M.plot(title = "Shape")
+figplot[0].savefig('./res/plot/shape.eps', format = 'eps')
+
+name = "./sources/plot_res.edp"
+proc = subprocess.Popen(["{FreeFem} {plot} > /dev/null 2>&1".format(FreeFem=path.FREEFEM,plot=name)],shell=True)
+proc.wait()
