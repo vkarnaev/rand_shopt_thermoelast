@@ -1,0 +1,24 @@
+include "./sources/inout.idp"
+include "./sources/macros.idp"
+load "msh3"
+
+real PARAM = getrParam(EXCHFILE,"KernelParam");
+string MESH = getsParam(EXCHFILE,"MeshName");
+
+mesh Th = readmesh(MESH);
+fespace Vh(Th, P1);
+Vh TstochX = PARAM;
+
+ofstream foutx("./sources/stoch_temp/seig_1.txt");
+foutx<<TstochX[]<<endl;   
+setrParam(EXCHFILE,"NumberOfSpaceEigens",1);
+
+int size = NOFTIMESTEPS+1;
+real[int] TstochT(size); // eigenvectors
+for(int i=0;i<size;i++){
+    TstochT[i] = PARAM;
+}
+
+ofstream foutt("./sources/stoch_temp/teig_1.txt");
+foutt<<TstochT<<endl;   
+setrParam(EXCHFILE,"NumberOfTimeEigens",1);

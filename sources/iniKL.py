@@ -23,5 +23,7 @@ def iniKL() :
   proc.wait()
 
   # Call to FreeFem for calculation of KL expression
-  execFreeFem.executeFF(nameScript=path.FFINIKLT, errorMessage = "Error in calculation of KL in time; abort.")
-  execFreeFem.executeFF(nameScript=path.FFINIKLS, errorMessage = "Error in calculation of KL in space; abort.")
+  #execFreeFem.executeFF(nameScript=path.FFINIKLT, errorMessage = "Error in calculation of KL in time; abort.")
+  #execFreeFem.executeFF(nameScript=path.FFINIKLS, errorMessage = "Error in calculation of KL in space; abort.")
+
+  execFreeFem.executeFF(nameScript=path.FFINIKLEASY, errorMessage = "Error in calculation of KL; abort.")
